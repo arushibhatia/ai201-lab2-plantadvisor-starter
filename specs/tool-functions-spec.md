@@ -70,7 +70,7 @@ likely match for clean user input. Aliases are the broadest net, so they go last
 *Aliases are stored as a list of strings. How will you check if the normalized input matches any alias in the list? Write your approach in pseudocode or plain English.*
 
 ```
-[your answer here]
+Convert every alias in the plant's alias list to lowercase and check whether the normalized user input exactly matches any alias. If a match is found, return that plant.
 ```
 
 ---
@@ -80,7 +80,7 @@ likely match for clean user input. Aliases are the broadest net, so they go last
 *When a plant isn't found, the agent will read your message and use it to decide what to tell the user. Write the exact string you'll return — make it useful to the agent, not just to a human reading logs.*
 
 ```
-[your answer here]
+Plant not found in the database. Try a common name, scientific name, or known alias.
 ```
 
 ---
