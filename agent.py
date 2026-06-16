@@ -128,4 +128,50 @@ def run_agent(user_message: str, history: list) -> str:
 
     Before writing code, complete specs/agent-loop-spec.md.
     """
-    return "🌱 Agent not yet implemented. Complete Milestone 2 to activate the Plant Advisor."
+    # Build the messages list: system prompt → conversation history → new user message.
+    # Gradio 6.x ChatInterface uses the "messages" format: history is a list of
+    # {"role", "content", ...} dicts. Replay each, keeping only role/content (Gradio
+    # may attach extra keys like "metadata"/"options" that the LLM API rejects).
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for turn in history:
+        messages.append({"role": turn["role"], "content": turn["content"]})
+    messages.append({"role": "user", "content": user_message})
+
+    # Tool-calling loop. We count ROUNDS (LLM turns), not individual tool calls —
+    # a single response may request several tools but still counts as one round.
+    for _ in range(MAX_TOOL_ROUNDS):
+        response = _client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=messages,
+            tools=TOOL_DEFINITIONS,
+            tool_choice="auto",
+        )
+        message = response.choices[0].message
+
+        # Case (a): no tool calls — the LLM has a final answer.
+        if not message.tool_calls:
+            return message.content
+
+        # Tool calls present: append the assistant message FIRST, then each result.
+        messages.append(message)
+        for tool_call in message.tool_calls:
+            tool_name = tool_call.function.name
+            # arguments may be empty/"null" for no-argument calls (e.g.
+            # get_seasonal_conditions with auto-detection) — coerce to a dict.
+            raw_args = tool_call.function.arguments
+            tool_args = json.loads(raw_args) if raw_args else {}
+            if tool_args is None:
+                tool_args = {}
+            tool_result = dispatch_tool(tool_name, tool_args)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": tool_result,
+            })
+
+    # Case (b): MAX_TOOL_ROUNDS exhausted without a final answer. The most recent
+    # assistant message requested tools, so its content is empty — return a fallback.
+    return (
+        "I wasn't able to finish looking that up. "
+        "Could you try rephrasing your question?"
+    )
